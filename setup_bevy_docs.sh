@@ -6,9 +6,31 @@ DOCS_ROOT=""
 RUSTDOC_DIR=""
 BEVY_DIR=""
 BEVY_WEBSITE_DIR=""
+BUILD_TARGET_DIR=""
+KEEP_TARGET=0
+BEVY_REMOTE="https://github.com/bevyengine/bevy.git"
+BEVY_WEBSITE_REMOTE="https://github.com/bevyengine/bevy-website.git"
+
+usage() {
+    cat >&2 <<EOF
+Usage: $0 [--keep-target] <shared_bevy_docs_dir>
+
+Options:
+  --keep-target  Keep Cargo build artifacts after rustdoc is copied.
+EOF
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --keep-target) KEEP_TARGET=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        -*) echo "error: unknown option $1" >&2; usage; exit 1 ;;
+        *) break ;;
+    esac
+done
 
 if [ $# -ne 1 ]; then
-    echo "Usage: $0 <shared_bevy_docs_dir>" >&2
+    usage
     exit 1
 fi
 
@@ -37,6 +59,8 @@ ensure_clean_repo() {
 clone_or_update_repo() {
     local url="$1"
     local dest="$2"
+    local ref="$3"
+    local required="$4"
 
     if [ ! -d "$dest/.git" ]; then
         if [ -e "$dest" ] && dir_has_entries "$dest"; then
@@ -44,37 +68,61 @@ clone_or_update_repo() {
             exit 1
         fi
         rmdir "$dest" 2>/dev/null || true
-        git clone "$url" "$dest"
+        if [ -n "$ref" ]; then
+            if remote_tag_exists "$url" "$ref"; then
+                git clone --depth 1 --branch "$ref" "$url" "$dest"
+                return
+            fi
+
+            if [ "$required" = "required" ]; then
+                echo "error: could not find required ref $ref in $url" >&2
+                exit 1
+            fi
+
+            echo "warning: ref $ref not found in $url; cloning default branch" >&2
+        fi
+
+        git clone --depth 1 "$url" "$dest"
         return
     fi
 
     ensure_clean_repo "$dest"
-    git -C "$dest" fetch --tags origin
-}
 
-latest_stable_tag() {
-    local repo_dir="$1"
-    git -C "$repo_dir" tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1
-}
+    if [ -z "$ref" ]; then
+        git -C "$dest" fetch --depth 1 origin
+        return
+    fi
 
-maybe_checkout_tag() {
-    local repo_dir="$1"
-    local ref="$2"
-    local required="$3"
+    if git -C "$dest" rev-parse -q --verify "refs/tags/$ref" >/dev/null; then
+        git -C "$dest" checkout --detach "$ref"
+        return
+    fi
 
-    [ -n "$ref" ] || return 0
-
-    if git -C "$repo_dir" rev-parse -q --verify "refs/tags/$ref" >/dev/null; then
-        git -C "$repo_dir" checkout "$ref"
-        return 0
+    if git -C "$dest" fetch --depth 1 origin "refs/tags/$ref:refs/tags/$ref"; then
+        git -C "$dest" checkout --detach "$ref"
+        return
     fi
 
     if [ "$required" = "required" ]; then
-        echo "error: could not find required ref $ref in $repo_dir" >&2
+        echo "error: could not find required ref $ref in $dest" >&2
         exit 1
     fi
 
-    echo "warning: ref $ref not found in $repo_dir; keeping current checkout" >&2
+    echo "warning: ref $ref not found in $dest; keeping current checkout" >&2
+}
+
+remote_tag_exists() {
+    local url="$1"
+    local ref="$2"
+    git ls-remote --exit-code --tags --refs "$url" "refs/tags/$ref" >/dev/null 2>&1
+}
+
+latest_stable_tag() {
+    local url="$1"
+    git ls-remote --tags --refs --sort=-v:refname "$url" 'refs/tags/v*' \
+        | awk '{ sub("refs/tags/", "", $2); print $2 }' \
+        | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+        | head -n 1
 }
 
 ensure_docs_gitignore() {
@@ -132,7 +180,7 @@ link_skill_docs() {
 }
 
 sync_rustdoc() {
-    local source_doc_root="$BEVY_DIR/target/doc"
+    local source_doc_root="$1"
 
     if [ ! -d "$source_doc_root" ]; then
         echo "error: rustdoc output not found at $source_doc_root" >&2
@@ -144,7 +192,7 @@ sync_rustdoc() {
 }
 
 build_rustdoc() {
-    cargo doc \
+    CARGO_TARGET_DIR="$BUILD_TARGET_DIR" cargo doc \
         --manifest-path "$BEVY_DIR/Cargo.toml" \
         -p bevy \
         -p bevy_app \
@@ -152,35 +200,46 @@ build_rustdoc() {
         -p bevy_asset \
         -p bevy_ui \
         --no-deps
-    sync_rustdoc
+    sync_rustdoc "$BUILD_TARGET_DIR/doc"
+
+    if [ "$KEEP_TARGET" -eq 0 ]; then
+        echo "Removing Cargo build artifacts from $BUILD_TARGET_DIR"
+        rm -rf "$BUILD_TARGET_DIR"
+
+        if [ -d "$BEVY_DIR/target" ] && [ "$(resolve_path "$BEVY_DIR/target")" != "$(resolve_path "$BUILD_TARGET_DIR")" ]; then
+            echo "Removing legacy Cargo build artifacts from $BEVY_DIR/target"
+            rm -rf "$BEVY_DIR/target"
+        fi
+    else
+        echo "Kept Cargo build artifacts at $BUILD_TARGET_DIR"
+    fi
 }
 
 DOCS_ROOT="$(resolve_path "$1")"
 RUSTDOC_DIR="$DOCS_ROOT/rustdoc"
 BEVY_DIR="$DOCS_ROOT/bevy"
 BEVY_WEBSITE_DIR="$DOCS_ROOT/bevy-website"
+BUILD_TARGET_DIR="${BEVY_DOCS_TARGET_DIR:-$DOCS_ROOT/.bevy-doc-target}"
 
 mkdir -p "$DOCS_ROOT"
 
 echo "Using shared Bevy docs folder: $DOCS_ROOT"
-echo "Bevy docs are heavy, about 7 GB after population."
+echo "Bevy docs are heavy, about 2 GB after population."
+echo "Pass --keep-target to trade about 4 GB more disk for faster rustdoc rebuilds."
 echo "Use a separate permanent folder outside this repo."
 
 link_skill_docs "$REPO_ROOT/bevy/skills/bevy-help"
 
-clone_or_update_repo "https://github.com/bevyengine/bevy.git" "$BEVY_DIR"
-clone_or_update_repo "https://github.com/bevyengine/bevy-website.git" "$BEVY_WEBSITE_DIR"
-
-STABLE_TAG="$(latest_stable_tag "$BEVY_DIR")"
+STABLE_TAG="$(latest_stable_tag "$BEVY_REMOTE" || true)"
 if [ -z "$STABLE_TAG" ]; then
     echo "error: unable to determine latest stable Bevy tag" >&2
     exit 1
 fi
 
-maybe_checkout_tag "$BEVY_DIR" "$STABLE_TAG" required
-maybe_checkout_tag "$BEVY_WEBSITE_DIR" "$STABLE_TAG" optional
+clone_or_update_repo "$BEVY_REMOTE" "$BEVY_DIR" "$STABLE_TAG" required
+clone_or_update_repo "$BEVY_WEBSITE_REMOTE" "$BEVY_WEBSITE_DIR" "$STABLE_TAG" optional
 build_rustdoc
 
 echo "Configured Bevy docs root: $DOCS_ROOT"
 echo "Linked bevy/skills/bevy-help/docs/*"
-echo "Populated Bevy repo, Bevy website, and rustdoc for ${STABLE_TAG#v}"
+echo "Populated shallow Bevy repo, Bevy website, and rustdoc for ${STABLE_TAG#v}"

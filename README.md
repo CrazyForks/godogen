@@ -65,7 +65,7 @@ If you're working on Bevy generation, configure and populate a shared Bevy docs 
 ./setup_bevy_docs.sh /absolute/or/user/path/to/bevy-docs
 ```
 
-The setup script links `bevy/skills/bevy-help/docs/` to that folder, clones the Bevy docs sources, and builds local rustdoc for the current stable release. No default path is assumed. See [setup.md](setup.md) for the full workstation setup.
+The setup script links `bevy/skills/bevy-help/docs/` to that folder, creates shallow Bevy docs source checkouts for new caches, and builds local rustdoc for the current stable release. No default path is assumed. See [setup.md](setup.md) for the full workstation setup.
 
 ## Running on a server
 

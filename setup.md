@@ -13,10 +13,13 @@ If you work on the Bevy source in this repo, choose a shared docs folder and pop
 This script:
 
 - links `bevy/skills/bevy-help/docs/` to one shared docs cache
-- clones or updates `bevy` and `bevy-website`
+- creates shallow `bevy` and `bevy-website` checkouts for new caches, or updates existing checkouts
 - builds local rustdoc for the current stable Bevy release
+- removes temporary Cargo build artifacts after rustdoc is copied
 
 No default path is assumed. Pick a writable folder on your machine. Published Bevy game repos reuse the source repo's configured docs symlinks.
+
+The default cache is roughly 2 GB. Pass `--keep-target` if you want faster repeated rustdoc rebuilds and can spare several more GB for Cargo build artifacts.
 
 ## .NET 9 SDK
 
