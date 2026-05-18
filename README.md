@@ -1,4 +1,6 @@
-# Godogen: Autonomous game development for Godot, Bevy, and Babylon.js with Claude Code and Codex
+# Godogen
+
+Autonomous game development for Godot, Bevy, and Babylon.js with Claude Code and Codex.
 
 [![Watch the video](https://img.youtube.com/vi/eUz19GROIpY/maxresdefault.jpg)](https://youtu.be/eUz19GROIpY)
 
