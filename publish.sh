@@ -2,11 +2,12 @@
 # Publish Godogen runtime files into a target game repo.
 #
 # Usage:
-#   ./publish.sh --engine godot|bevy|babylon --agent claude|codex --out <target_dir> [--force]
-#   ./publish.sh --engine godot|bevy|babylon --agent claude|codex <target_dir> [--force]
+#   ./publish.sh --engine godot|bevy|babylon --agent claude|codex --out <target_dir> [--force] [--video_hook]
+#   ./publish.sh --engine godot|bevy|babylon --agent claude|codex <target_dir> [--force] [--video_hook]
 #
-# The Stop hook is best-effort: when `tg-push` and TG_* env vars are present at runtime
-# it pushes the latest screenshots/result/{N}/video.mp4 to Telegram, otherwise it no-ops.
+# --video_hook installs the optional Stop hook (off by default). When enabled, the hook
+# is best-effort: with `tg-push` and TG_* env vars present at runtime it pushes the
+# latest screenshots/result/{N}/video.mp4 to Telegram, otherwise it no-ops.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -16,9 +17,10 @@ ENGINE=""
 AGENT=""
 OUT=""
 FORCE=0
+VIDEO_HOOK=0
 
 usage() {
-    sed -n '1,9p' "$0" >&2
+    sed -n '1,10p' "$0" >&2
 }
 
 resolve_path() {
@@ -64,6 +66,7 @@ while [ $# -gt 0 ]; do
         --agent)  AGENT="${2:-}";  shift 2 ;;
         --out)    OUT="${2:-}";    shift 2 ;;
         --force)  FORCE=1;         shift   ;;
+        --video_hook) VIDEO_HOOK=1; shift   ;;
         -h|--help) usage; exit 0 ;;
         -*) echo "error: unknown option $1" >&2; usage; exit 1 ;;
         *)
@@ -191,22 +194,25 @@ cp "$TMP/game/game-engine.md" "$TARGET/$MANIFEST"
 echo "Created $MANIFEST"
 
 mkdir -p "$TARGET/$HOOK_CONFIG_DIR/hooks"
-rsync -a "$REPO_ROOT/shared/hooks/stop_post_task_gate.py" \
-    "$TARGET/$HOOK_CONFIG_DIR/hooks/"
 rsync -a "$REPO_ROOT/$ENGINE/hooks/" "$TARGET/$HOOK_CONFIG_DIR/hooks/"
 python3 "$HELPERS/render_dir.py" "$TARGET/$HOOK_CONFIG_DIR/hooks" \
     "AGENT_ID=$AGENT" \
     "AGENT_NAME=$AGENT_NAME" \
     "HOOK_CONFIG_DIR=$HOOK_CONFIG_DIR" \
     "ENGINE_NAME=${ENGINE^}"
-chmod +x "$TARGET/$HOOK_CONFIG_DIR/hooks/stop_post_task_gate.py" "$TARGET/$HOOK_CONFIG_DIR/hooks/capture_result.sh"
+chmod +x "$TARGET/$HOOK_CONFIG_DIR/hooks/capture_result.sh"
 
-if [ "$AGENT" = "codex" ]; then
-    python3 "$HELPERS/write_codex_stop_hook.py" "$TARGET/$HOOK_CONFIG_DIR/config.toml"
-    echo "Installed Codex stop hook"
-else
-    python3 "$HELPERS/merge_claude_stop_hook.py" "$TARGET/$HOOK_CONFIG_DIR/settings.json"
-    echo "Installed Claude Code stop hook"
+if [ "$VIDEO_HOOK" -eq 1 ]; then
+    rsync -a "$REPO_ROOT/shared/hooks/stop_post_task_gate.py" \
+        "$TARGET/$HOOK_CONFIG_DIR/hooks/"
+    chmod +x "$TARGET/$HOOK_CONFIG_DIR/hooks/stop_post_task_gate.py"
+    if [ "$AGENT" = "codex" ]; then
+        python3 "$HELPERS/write_codex_stop_hook.py" "$TARGET/$HOOK_CONFIG_DIR/config.toml"
+        echo "Installed Codex stop hook"
+    else
+        python3 "$HELPERS/merge_claude_stop_hook.py" "$TARGET/$HOOK_CONFIG_DIR/settings.json"
+        echo "Installed Claude Code stop hook"
+    fi
 fi
 
 if [ ! -f "$TARGET/.gitignore" ]; then

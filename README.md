@@ -30,7 +30,7 @@ Claude Code vs Codex is a publish-time render choice, not a separate source tree
 - **Asset generation** — Gemini creates precise references and characters; xAI Grok handles textures and simple objects; Tripo3D converts images to 3D models. Animated sprites use Grok video generation with loop detection.
 - **C# / .NET 9 for Godot** — Godot output uses C#. See [why C# over GDScript](docs/gdscript-vs-csharp.md).
 - **Frame-grounded self-repair** — the agent is carefully prompted to judge progress from captured screenshots, not from code that compiles, so visible defects (clipping, wrong scale, frozen motion, missing assets) drive the next iteration instead of being rationalized away.
-- **Telegram proof push** — published repos install a stop hook that pushes the latest `screenshots/result/{N}/video.mp4` to Telegram when `tg-push` and the TG_* env vars are configured. No-op otherwise.
+- **Telegram proof push** — opt in with `--video_hook` at publish time to install a stop hook that pushes the latest `screenshots/result/{N}/video.mp4` to Telegram when `tg-push` and the TG_* env vars are configured. No-op otherwise. Off by default.
 - **Runs on commodity hardware** — any machine with the relevant engine toolchain, Python, and the required API keys can run the pipeline.
 
 ## Getting started
@@ -63,7 +63,7 @@ Pick the engine and host agent:
 ./publish.sh --engine babylon --agent codex  --out ~/my-game
 ```
 
-Pass `--force` to wipe existing contents at the target before publishing — use this when re-publishing over a previous run.
+Pass `--force` to wipe existing contents at the target before publishing — use this when re-publishing over a previous run. Pass `--video_hook` to install the optional Telegram stop hook (off by default; see below).
 
 ### Bevy docs setup
 
@@ -80,7 +80,7 @@ The setup script links `bevy/skills/bevy-help/docs/` to that folder, creates sha
 A full generation run can take hours, so it's convenient to offload it to a server, ideally a GPU instance, since engine rendering and video capture are much faster with hardware acceleration.
 
 - Keep the session alive across SSH drops with `tmux` or `screen`.
-- Install [tg-push](https://github.com/htdt/tg-push): the stop hook auto-sends the final proof video to Telegram on completion.
+- Install [tg-push](https://github.com/htdt/tg-push) and publish with `--video_hook`: the stop hook auto-sends the final proof video to Telegram on completion.
 - Enable remote control so you can check in and steer the run from any device — both Claude Code and Codex have official remote-control interfaces.
 
 ## Improving the skills
