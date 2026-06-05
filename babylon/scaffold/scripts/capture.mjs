@@ -1,5 +1,5 @@
 import { statSync } from "node:fs";
-import { mkdir, rename } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
@@ -45,8 +45,7 @@ if (
 function usage() {
   console.error(`Usage:
   node scripts/capture.mjs still <png-path> [url]
-  node scripts/capture.mjs frames <out-dir> <frame-count> [url] [fps]
-  node scripts/capture.mjs video <out-dir> <seconds> [url]`);
+  node scripts/capture.mjs frames <out-dir> <frame-count> [url] [fps]`);
 }
 
 function findChrome() {
@@ -78,7 +77,7 @@ function statSyncFile(path) {
   return statSync(path).isFile();
 }
 
-async function launchBrowser(recordDir) {
+async function launchBrowser() {
   const executablePath = findChrome();
   const headless = process.env.GODOGEN_CAPTURE_HEADLESS === "1";
   const browser = await chromium.launch({
@@ -98,13 +97,7 @@ async function launchBrowser(recordDir) {
 
   const context = await browser.newContext({
     viewport: { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT },
-    deviceScaleFactor: 1,
-    recordVideo: recordDir
-      ? {
-          dir: recordDir,
-          size: { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT }
-        }
-      : undefined
+    deviceScaleFactor: 1
   });
 
   return { browser, context };
@@ -189,30 +182,6 @@ async function captureFrames(outDir, frameCount, url, fps) {
   }
 }
 
-async function captureVideo(outDir, seconds, url) {
-  await mkdir(outDir, { recursive: true });
-  const { browser, context } = await launchBrowser(outDir);
-  let page;
-  try {
-    page = await openPage(context, url);
-    console.log(`[capture] recording ${seconds}s from ${url}`);
-    await page.waitForTimeout(seconds * 1000);
-  } finally {
-    await context.close();
-    await browser.close();
-  }
-
-  const video = page?.video();
-  if (!video) {
-    throw new Error("Playwright did not produce a browser video");
-  }
-
-  const tmpVideo = await video.path();
-  const target = join(outDir, "video.webm");
-  await rename(tmpVideo, target);
-  console.log(`[capture] wrote ${target}`);
-}
-
 const [mode, arg1, arg2, arg3, arg4] = process.argv.slice(2);
 
 try {
@@ -225,8 +194,6 @@ try {
       arg3 ?? DEFAULT_URL,
       arg4 ? Number.parseInt(arg4, 10) : DEFAULT_FPS
     );
-  } else if (mode === "video" && arg1 && arg2) {
-    await captureVideo(resolve(arg1), Number.parseFloat(arg2), arg3 ?? DEFAULT_URL);
   } else {
     usage();
     process.exitCode = 2;

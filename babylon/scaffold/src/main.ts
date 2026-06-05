@@ -1,11 +1,14 @@
 import "./style.css";
-import { BabylonApp } from "./app/BabylonApp";
-import { createScene } from "./game/scene";
+import { BabylonApp, type SceneFactory } from "./app/BabylonApp";
+import { resolveSceneModule } from "./game/scenes/registry";
 
-interface SceneChangePayload {
-  file: string;
-  time: number;
-}
+// Bundled lazy loaders for every scene module — keys look like
+// "./game/scenes/main.ts". The active scene is chosen from the ?scene= URL
+// param. There is no auto hot reload: refresh the browser to apply edits, so
+// game state survives until you choose to reset it.
+const sceneLoaders = import.meta.glob<{ createScene: SceneFactory }>(
+  "./game/scenes/*.ts"
+);
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas");
 
@@ -15,18 +18,16 @@ if (!canvas) {
 
 const app = new BabylonApp(canvas);
 
-await app.load(createScene);
-app.start();
+const moduleKey = resolveSceneModule(
+  new URLSearchParams(location.search).get("scene")
+).replace("/src/", "./");
 
-if (import.meta.env.DEV && import.meta.hot) {
-  import.meta.hot.on("godogen:scene-change", async (payload: SceneChangePayload) => {
-    console.info(`[godogen] scene reload: ${payload.file}`);
-    const sceneUrl = `/src/game/scene.ts?godogen-reload=${payload.time}`;
-    const sceneModule = await import(/* @vite-ignore */ sceneUrl);
-    await app.load(sceneModule.createScene);
-  });
+const loadScene = sceneLoaders[moduleKey];
 
-  import.meta.hot.dispose(() => {
-    app.dispose();
-  });
+if (!loadScene) {
+  throw new Error(`No scene module registered for "${moduleKey}"`);
 }
+
+const mod = await loadScene();
+await app.load(mod.createScene);
+app.start();

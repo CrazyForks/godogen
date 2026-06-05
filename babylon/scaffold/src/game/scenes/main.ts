@@ -1,4 +1,4 @@
-import type { BabylonApp } from "../app/BabylonApp";
+import type { BabylonApp } from "../../app/BabylonApp";
 import {
   ArcRotateCamera,
   Color3,
@@ -8,7 +8,7 @@ import {
   Scene,
   StandardMaterial,
   Vector3
-} from "../app/babylon";
+} from "../../app/babylon";
 
 export async function createScene(app: BabylonApp): Promise<Scene> {
   const scene = new Scene(app.engine);

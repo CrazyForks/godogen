@@ -4,7 +4,7 @@ Implementation workflow for Babylon.js feature work after scaffold is in place.
 
 ## Planning Each Task
 
-- Read `STRUCTURE.md`, `package.json`, `src/game/scene.ts`, `architecture.md`, `scene-generation.md`, and `quirks.md` before touching code.
+- Read `STRUCTURE.md`, `package.json`, `src/game/scenes/main.ts`, `architecture.md`, `scene-generation.md`, and `quirks.md` before touching code.
 - Use `babylon-help` for Babylon APIs, loaders, exact import paths, Vite behavior, browser capture, and rendering setup.
 - Decide the concrete scope: state owner, modules/files, runtime assets, verification commands, and browser evidence.
 - Preserve dependency versions unless the task is an engine/tool migration.
@@ -14,7 +14,7 @@ Implementation workflow for Babylon.js feature work after scaffold is in place.
 
 1. Start or reuse `npm run dev`.
 2. Implement the next visible/playable slice.
-3. Let Vite hot reload the scene.
+3. Refresh the browser to see the edit; tell the user to refresh when you want them to see it.
 4. Capture an ad hoc screenshot when the change is visual:
    ```bash
    node scripts/capture.mjs still screenshots/{task}/still.png
@@ -43,6 +43,8 @@ Required for browser validation:
 
 ## Assets
 
+Time asset generation to where the work is. When the substance is logic, build on placeholders — primitives, flat colors, procedural stand-ins — until the design that needs a real asset is settled, then generate it and swap it in. When the substance is the art, generate the real assets early and build around them; a placeholder would tell you nothing. See `interactive.md` for asset timing and budget confirmation.
+
 Use Vite asset URLs:
 
 ```ts
@@ -60,23 +62,19 @@ await SceneLoader.ImportMeshAsync("", "", heroUrl, scene);
 
 Use `public/**` only for files that need stable direct URLs. Imported runtime assets should normally live under `src/assets/**`.
 
-## Final Proof
+## Delivery
 
-Final Babylon proof uses browser video recording:
+The deliverable is the live URL, not a video. Surface it as soon as something is showable and keep `npm run dev` alive so the user sees every change.
 
-```bash
-bash .codex/hooks/capture_result.sh screenshots/result/{N}
-```
-
-For Claude Code repos, use `.claude/hooks/capture_result.sh`.
-
-The result folder must contain `video.webm` and `video.mp4`. The MP4 should be 15 to 30 seconds and show task-relevant behavior for the full duration. If the scene is static, make the capture camera or scripted presentation vary the view.
+- Default scene: `http://127.0.0.1:5173/` (builds `?scene=main`).
+- Isolated review scene (on demand only): `http://127.0.0.1:5173/?scene=<name>` — add the route in `src/game/scenes/registry.ts`, fold it back into `main` once accepted.
+- Remote user: serve a shareable link instead (`npm run dev:lan` or a tunnel) — see `interactive.md`.
 
 ## Stop Conditions
 
 - `npm run check` passes.
-- `npm run build` passes.
-- The Vite dev server runs at `http://127.0.0.1:5173`.
+- `npm run build` passes (compile gate).
+- The Vite dev server runs and the user has the live URL.
 - Browser validation confirms WebGL2 hardware rendering.
-- Visual requirements are verified from screenshot or video.
+- Visual requirements verified from your own screenshots and confirmed live by the user.
 - `STRUCTURE.md` matches the shipped runtime shape.

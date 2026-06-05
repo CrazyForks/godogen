@@ -29,7 +29,9 @@ Avoid deep inheritance. Avoid hiding Babylon behind a heavy fake-engine abstract
 
 ECS is not the default. Use small data-oriented systems only for dense repeated simulation such as bullets, particles, collectibles, boids, crowds, or grid simulations. Do not convert the whole game to ECS unless the brief strongly justifies it.
 
-Common top-level objects may include `BabylonApp`, `SceneManager`, `GameWorld`, `AssetManager`, `InputManager`, `AudioManager`, `PhysicsManager`, `CameraController`, `UIController`, `EventBus`, and `DebugTools`. Create only the ones the game needs.
+Common top-level objects may include `BabylonApp`, `GameWorld`, `AssetManager`, `InputManager`, `AudioManager`, `PhysicsManager`, `CameraController`, `UIController`, `EventBus`, and `DebugTools`. Create only the ones the game needs. (Scene selection is already handled by the `src/game/scenes/` registry and the `?scene=` router — you don't need a separate `SceneManager`.)
+
+On-demand isolated features live as their own scene module under `src/game/scenes/` and import the shared gameplay objects from `src/game/`, so the same code runs in both the isolated route and `main`.
 
 Use semantic input actions rather than raw key checks spread across gameplay code. Keep UI separate from core gameplay rules. Represent important modes explicitly with state machines or equivalent state when behavior depends on modes.
 

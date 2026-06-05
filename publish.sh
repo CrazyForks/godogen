@@ -7,7 +7,8 @@
 #
 # --video_hook installs the optional Stop hook (off by default). When enabled, the hook
 # is best-effort: with `tg-push` and TG_* env vars present at runtime it pushes the
-# latest screenshots/result/{N}/video.mp4 to Telegram, otherwise it no-ops.
+# latest screenshots/result/{N}/video.mp4 to Telegram, otherwise it no-ops. Ignored for
+# --engine babylon, which delivers a live URL instead of a video.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -194,15 +195,21 @@ cp "$TMP/game/game-engine.md" "$TARGET/$MANIFEST"
 echo "Created $MANIFEST"
 
 mkdir -p "$TARGET/$HOOK_CONFIG_DIR/hooks"
-rsync -a "$REPO_ROOT/$ENGINE/hooks/" "$TARGET/$HOOK_CONFIG_DIR/hooks/"
-python3 "$HELPERS/render_dir.py" "$TARGET/$HOOK_CONFIG_DIR/hooks" \
-    "AGENT_ID=$AGENT" \
-    "AGENT_NAME=$AGENT_NAME" \
-    "HOOK_CONFIG_DIR=$HOOK_CONFIG_DIR" \
-    "ENGINE_NAME=${ENGINE^}"
-chmod +x "$TARGET/$HOOK_CONFIG_DIR/hooks/capture_result.sh"
+if [ -d "$REPO_ROOT/$ENGINE/hooks" ]; then
+    rsync -a "$REPO_ROOT/$ENGINE/hooks/" "$TARGET/$HOOK_CONFIG_DIR/hooks/"
+    python3 "$HELPERS/render_dir.py" "$TARGET/$HOOK_CONFIG_DIR/hooks" \
+        "AGENT_ID=$AGENT" \
+        "AGENT_NAME=$AGENT_NAME" \
+        "HOOK_CONFIG_DIR=$HOOK_CONFIG_DIR" \
+        "ENGINE_NAME=${ENGINE^}"
+fi
+if [ -f "$TARGET/$HOOK_CONFIG_DIR/hooks/capture_result.sh" ]; then
+    chmod +x "$TARGET/$HOOK_CONFIG_DIR/hooks/capture_result.sh"
+fi
 
-if [ "$VIDEO_HOOK" -eq 1 ]; then
+if [ "$VIDEO_HOOK" -eq 1 ] && [ "$ENGINE" = "babylon" ]; then
+    echo "Note: --video_hook is ignored for Babylon (delivery is a live URL, not a video)."
+elif [ "$VIDEO_HOOK" -eq 1 ]; then
     rsync -a "$REPO_ROOT/shared/hooks/stop_post_task_gate.py" \
         "$TARGET/$HOOK_CONFIG_DIR/hooks/"
     chmod +x "$TARGET/$HOOK_CONFIG_DIR/hooks/stop_post_task_gate.py"

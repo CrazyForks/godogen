@@ -1,6 +1,6 @@
 # Babylon Scaffold
 
-Create or refresh a Babylon.js + TypeScript + Vite project shell. This defines the runtime entrypoints and hot-reload contract; gameplay generation fills in `src/game/**`.
+Create or refresh a Babylon.js + TypeScript + Vite project shell. This defines the runtime entrypoints and reload model; gameplay generation fills in `src/game/**`.
 
 ## Workflow
 
@@ -9,12 +9,12 @@ Create or refresh a Babylon.js + TypeScript + Vite project shell. This defines t
 3. Existing Babylon project: preserve package name and dependency versions unless the user asked for a migration. Preserve `package-lock.json` when it already matches the manifest.
 4. Keep the baseline contract:
    - `index.html` contains `canvas#game-canvas` and `div#hud`.
-   - `src/main.ts` creates one `BabylonApp`, loads `createScene`, and listens for `godogen:scene-change`.
+   - `src/main.ts` creates one `BabylonApp`, resolves the active scene from `?scene=` via the registry, and loads it.
    - `src/app/BabylonApp.ts` owns the Babylon `Engine` lifecycle.
    - `src/app/babylon.ts` is the project import surface for Babylon symbols.
-   - `src/game/scene.ts` exports `createScene(app)`.
+   - `src/game/scenes/main.ts` exports `createScene(app)`; `src/game/scenes/registry.ts` maps scene names to modules (`main` is the default).
    - `src/game/assets.ts`, `input.ts`, and `state.ts` are small helpers, not mandatory frameworks.
-   - `scripts/capture.mjs` captures browser screenshots/video through Chrome/Chromium.
+   - `scripts/capture.mjs` captures browser screenshots through Chrome/Chromium.
 5. Run `npm install` if `node_modules/` is missing or `package-lock.json` is stale.
 6. Run `npm run check`.
 7. Run `npm run build`.
@@ -35,7 +35,8 @@ src/main.ts
 src/style.css
 src/app/BabylonApp.ts
 src/app/babylon.ts
-src/game/scene.ts
+src/game/scenes/main.ts
+src/game/scenes/registry.ts
 src/game/assets.ts
 src/game/input.ts
 src/game/state.ts
@@ -60,20 +61,11 @@ The current baseline package versions are:
 
 These versions were checked against npm during the Babylon source update. For a new project, use the current source scaffold. For an existing project, avoid opportunistic dependency churn.
 
-## Hot Reload Contract
+## Reload Model
 
-`vite.config.ts` installs the `godogen-babylon-reload` plugin:
+`vite.config.ts` installs the `godogen-babylon-dev` plugin, which serves project-root QA images (`/reference.png`) and disables auto-reload — edits apply on the next browser refresh, a clean full load (fresh `Engine`, `Scene`, and WebGL context). The dev server always serves current source, so a refresh never shows stale code.
 
-```text
-src/game/**     -> custom godogen:scene-change, recreate Scene only
-src/assets/**   -> custom godogen:scene-change, recreate Scene only
-src/app/**      -> full browser reload
-public/**       -> full browser reload
-index.html      -> full browser reload
-vite.config.ts  -> full browser reload
-```
-
-The engine and canvas persist across scene reloads. `createScene(app)` must create a fresh `Scene` and leave cleanup to `BabylonApp.load`, which disposes the previous scene after the new one is ready.
+`createScene(app)` must create a fresh `Scene` every call. `BabylonApp.load` disposes the previous scene after the new one is ready, so switching the `?scene=` route never leaks the old scene.
 
 ## STRUCTURE.md
 
@@ -92,13 +84,14 @@ Write `STRUCTURE.md` in full. Start with this shape:
 ## App Entry
 
 - `index.html` -> `src/main.ts`
-- `src/main.ts` -> creates `BabylonApp`, loads `createScene(app)`, starts render loop, handles scene hot reload
+- `src/main.ts` -> creates `BabylonApp`, resolves the `?scene=` route via the registry, loads it, starts the render loop
 - `src/app/BabylonApp.ts` -> owns `Engine`, active `Scene`, resize, disposal
 - `src/app/babylon.ts` -> Babylon import barrel
 
 ## Game Entry
 
-- `src/game/scene.ts` -> exports `createScene(app)`
+- `src/game/scenes/main.ts` -> default scene, exports `createScene(app)`
+- `src/game/scenes/registry.ts` -> scene name -> module map; `?scene=<name>` selects it (`main` default)
 - `src/game/assets.ts` -> imported asset URLs
 - `src/game/input.ts` -> optional input helper
 - `src/game/state.ts` -> optional state helper
@@ -119,7 +112,8 @@ Write `STRUCTURE.md` in full. Start with this shape:
 - `npm run check`
 - `npm run build`
 - `npm run dev`
-- browser screenshot/video capture through `scripts/capture.mjs`
+- browser screenshot self-check through `scripts/capture.mjs`
+- user confirms the playable result live at the URL
 ````
 
 Keep `STRUCTURE.md` structural. Do not turn it into a task log.

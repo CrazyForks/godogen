@@ -1,51 +1,51 @@
-import { defineConfig, normalizePath, type Plugin } from "vite";
+/// <reference types="node" />
+import { createReadStream, existsSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { defineConfig, type Plugin } from "vite";
 
-function isSceneReloadPath(file: string): boolean {
-  return file.includes("/src/game/") || file.includes("/src/assets/");
-}
+// QA images the agent generates at the project root (outside src/ and public/)
+// so they can be shown to the user by URL without polluting runtime asset paths.
+const ROOT_IMAGE = /^\/(reference[\w.-]*\.png)$/;
 
-function isFullReloadPath(file: string): boolean {
-  return (
-    file.endsWith("/index.html") ||
-    file.includes("/src/app/") ||
-    file.includes("/public/") ||
-    file.endsWith("/vite.config.ts")
-  );
-}
-
-function godogenBabylonReload(): Plugin {
+function godogenBabylonDev(): Plugin {
   return {
-    name: "godogen-babylon-reload",
+    name: "godogen-babylon-dev",
     apply: "serve",
 
-    async hotUpdate(ctx) {
+    configureServer(server) {
+      // Serve project-root QA images (e.g. /reference.png) so the agent can
+      // show the user the reference in the browser.
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split("?")[0] ?? "";
+        const match = ROOT_IMAGE.exec(url);
+        if (!match) return next();
+
+        const file = resolve(join(server.config.root, match[1]));
+        if (!file.startsWith(server.config.root) || !existsSync(file)) {
+          return next();
+        }
+
+        res.setHeader("Content-Type", "image/png");
+        res.setHeader("Cache-Control", "no-cache");
+        createReadStream(file).pipe(res);
+      });
+    },
+
+    // Manual-reload model: a save never auto-reloads the page. Returning an
+    // empty array tells Vite the update is fully handled, suppressing the
+    // default HMR / full reload. Refresh the browser to apply edits — the dev
+    // server always serves the current source, and game state survives until
+    // you choose to reset it. (State-preserving HMR — swapping only what
+    // changed while keeping state — is intentionally not implemented yet.)
+    hotUpdate() {
       if (this.environment.name !== "client") return;
-
-      const file = normalizePath(ctx.file);
-
-      if (isSceneReloadPath(file)) {
-        await ctx.read();
-        this.environment.hot.send({
-          type: "custom",
-          event: "godogen:scene-change",
-          data: { file, time: ctx.timestamp }
-        });
-        return [];
-      }
-
-      if (isFullReloadPath(file)) {
-        await ctx.read();
-        this.environment.hot.send({ type: "full-reload", path: "*" });
-        return [];
-      }
-
-      return;
+      return [];
     }
   };
 }
 
 export default defineConfig({
-  plugins: [godogenBabylonReload()],
+  plugins: [godogenBabylonDev()],
 
   assetsInclude: [
     "**/*.glb",

@@ -1,101 +1,82 @@
-# Game Decomposer
+# Game Reader
 
-Analyze a game for implementation risks and define verification criteria. Output is `PLAN.md`.
+Read the task well enough to propose an approach, then write a thin plan in the shape of the approach the user picks. Planning is emergent: the plan starts small and grows as the user reacts on the live URL — it is not a frozen up-front contract.
 
-## Runtime Limitations
+This runs in two passes around the approach checkpoint (`interactive.md`).
 
-Babylon output runs in the browser. The pipeline does not ship native or mobile packaging. Browser audio cannot autoplay before a user gesture — interactive games can unlock audio on first input, but a passive presentation video has no gesture and will be silent. If the brief assumes a native build or asks for audio in the final proof clip, drop those parts of the scope and tell the user what was dropped.
+## Runtime limitations
 
-## Workflow
+Babylon output runs in the browser. The pipeline does not ship native or mobile packaging, and browser audio cannot play before a user gesture. If the brief assumes a native build or background audio with no interaction, drop those parts and tell the user what was dropped.
 
-1. **Read `reference.png`** — camera angle, scene complexity, entity count, environment scope.
-2. **Read the game description** — core technical requirements.
-3. **Scan for risks** — identify features needing isolation (see taxonomy below).
-4. **Define verification criteria** — risk-specific, general, and final.
-5. **Write `PLAN.md`.**
+## Pass 1 — light read
 
-## Risk Taxonomy
+Before proposing an approach, produce a short read (a handful of lines, not a task list):
 
-### Isolate
+- **What the game is** — genre, core loop, camera, dimensionality.
+- **Hard / uncertain parts** — use the risk taxonomy below as a *detector*. These are the things to tackle first and watch closely, and what shapes the approach proposal. Naming them is not a commitment to isolate them.
+- **Asset sense** — rough kind and count (models, sprites, textures, backgrounds), and how much of the task *is* assets versus logic. *When* to generate is a build decision shaped by that weight — placeholders first when the substance is logic, real assets first when it is the art (`interactive.md`).
+- **Smallest showable first** — the earliest slice worth putting on the live URL.
 
-Features that fail unpredictably and produce ambiguous errors when mixed with other systems:
+Use this read to recommend a build approach in `interactive.md`.
+
+### Risk taxonomy (detector)
+
+Features that tend to fail first-pass and benefit from early, focused attention:
 
 - **Procedural generation** — terrain, levels, meshes, dungeon layouts
-- **Procedural animation** — runtime bone manipulation, IK, ragdoll blending. Motions jerk, blend weights fight, limbs overshoot.
-- **Sprite/character animations** — multi-direction movement, state transitions. Almost always fail first pass: wrong frames for direction, transitions stutter or pop.
-- **Complex vehicle physics** — wheel colliders, suspension, drifting, motorcycle balance. Babylon physics plugins (Havok, Cannon, Ammo) differ enough that the wrong choice can derail a task.
-- **Custom shaders** — `ShaderMaterial`, `NodeMaterial`, post-process effects, water surfaces, portals, dissolve/distortion
-- **Runtime geometry** — destructible environments, CSG operations, mesh deformation, baked-on-demand vertex data
-- **Dynamic navigation** — pathfinding adapting to runtime obstacles, crowd simulation, flocking. Babylon ships the `recastjs` plugin but real-time rebuild requires care.
-- **Complex camera systems** — third-person with collision avoidance, cinematic rail transitions, pointer-lock first-person, split-screen
-- **Pointer lock / first-person controls** — browser pointer-lock API needs a user gesture to engage and silently no-ops in some embed contexts.
-- **Imported GLB pipelines** — animation retargeting, morph targets, skeleton mismatches, draco/meshopt compression. Resolve loader extensions before relying on imported rigs.
+- **Procedural animation** — runtime bone manipulation, IK, ragdoll blending
+- **Sprite/character animations** — multi-direction movement, state transitions; wrong frames per direction, stutter or pop on transitions
+- **Complex vehicle physics** — wheel colliders, suspension, drifting; Havok/Cannon/Ammo differ enough that the wrong choice derails the work
+- **Custom shaders** — `ShaderMaterial`, `NodeMaterial`, post-process, water, portals, dissolve/distortion
+- **Runtime geometry** — destructible meshes, CSG, deformation, baked-on-demand vertex data
+- **Dynamic navigation** — pathfinding around runtime obstacles, crowds, flocking (`recastjs` real-time rebuild needs care)
+- **Complex cameras** — third-person with collision avoidance, cinematic rails, pointer-lock first-person, split-screen
+- **Pointer lock / first-person** — needs a user gesture; silently no-ops in some embed contexts
+- **Imported GLB pipelines** — animation retargeting, morph targets, skeleton mismatches, draco/meshopt; resolve loader extensions before relying on imported rigs
 
-Everything not listed above goes in the main build — no isolation needed.
+Everything else is routine — build it directly.
 
-## Verification Criteria
+## Pass 2 — thin PLAN.md
 
-Each task gets a **Verify** field inline — what to check after implementation.
+After the user picks an approach, write `PLAN.md` in that approach's shape. Keep it thin; it is a living doc you revise at every checkpoint.
 
-**Risk tasks** — target the exact failure mode (e.g., for animations: "every direction plays correct frames, transitions smooth, no pose snapping").
+- **one-shot-then-polish** — a "first cut" goal for `main`, plus a polish backlog that fills in from the user's live reactions.
+- **hard-parts-first** — an ordered list of the hard parts (each a slice landed in `main` and confirmed live), then assembly, then routine fill.
+- **linear** — a feature sequence, each verified live before the next.
 
-Whenever a requirement mentions smooth motion, state handoff (idle->walk, walk->attack, place/pickup, jump->land), or any runtime transition, the Verify line must name the specific transition to probe dynamically — not "matches reference.png". Reference-match is a static check and cannot see motion-timing bugs.
+Record the chosen approach and the reference-usage mode at the top so they survive compaction.
 
-**Main build** — combine cross-cutting checks with game-specific ones:
-- Movement direction matches player input
-- Animation direction matches movement direction
-- Player input -> character response feels correct
-- Physics objects respond to gravity/collision
-- UI readable, no overflow or overlap
-- No missing textures or obvious fallback materials
-- Game-specific checks (e.g., "enemies path around towers," "score increments on pickup")
-- No browser console errors during the captured run
-- reference.png consistency
-- Presentation proof bundle as final deliverable
+### Verification
 
-## Output Format
+Verification is mostly the user watching the live URL. For each slice, note **what to look at** — the specific behavior or transition to confirm — and self-check it with a `capture.mjs still` (see `capture.md`) before showing the user, so you never present an obviously broken state. You do not need exhaustive motion probes: the user sees motion directly.
 
-Produce `PLAN.md`:
+Hold verification to the reference-usage mode:
+
+- **precise** — reference consistency (palette, scale, camera, density) is a real criterion.
+- **art-direction** — check palette and mood, not layout.
+- **rough guide** — no reference-match gate.
+
+General things worth a glance on most slices: input → response feels right, animation matches movement direction, physics responds to gravity/collision, UI readable, no missing textures or placeholder materials, no browser console errors.
+
+## PLAN.md shape
 
 ````markdown
 # Game Plan: {Name}
 
-## Risk Tasks
+**Approach:** {one-shot-then-polish | hard-parts-first | linear}
+**Reference mode:** {precise | art-direction | rough guide | none}
 
-{Omit entirely if no risks identified.}
+## Now
+{the current slice}
 
-### 1. {Risk Feature}
-- **Why isolated:** {what makes this algorithmically hard}
-- **Approach:** {algorithmic strategy or key constraints — enough for the implementor to know *how*, not just *what*}
-- **Verify:** {specific criteria targeting the failure mode}
+## Next
+{the few upcoming slices, in the approach's shape — kept short, grown as you go}
 
-## Main Build
+## Reviewed live
+{slices the user has seen and accepted}
 
-{What to build — all routine systems. High-level, not implementation recipes.}
-
-- **Assets needed:** {visual assets the game needs — type, approximate size, visual role. Omit if none.}
-- **Verify:**
-  - {General checks: movement/input/animation alignment, physics, UI, textures}
-  - {Game-specific checks}
-  - Gameplay flow matches game description
-  - No visual glitches, clipping, or placeholder assets
-  - No browser console errors during capture
-  - reference.png consistency: color palette, scale, camera angle, visual density
-  - **Presentation proof bundle:** latest final-attempt folder under `screenshots/result/{N}/`
-    - Record from the running Vite dev server at `http://127.0.0.1:5173` through `scripts/capture.mjs video` (Playwright + Chrome/Chromium). Default duration is 15s; extend to 30s only when needed for coverage.
-    - `{N}` is a simple integer counter; increment it for each new final attempt
-    - Store both `video.webm` (browser recording) and `video.mp4` (ffmpeg re-encode) in that folder
-    - **3D:** scripted camera path or orbit, deliberate lighting, post-processing where it earns its cost
-    - **2D:** camera pans, zoom transitions, tight viewport framing
-    - Output: `screenshots/result/{N}/video.mp4`
+## Open questions
+{anything waiting on the user}
 ````
 
-Include only the relevant 3D/2D presentation requirements.
-
-## What NOT to Include
-
-- Implementation details for routine features (risk tasks need algorithmic specificity — see template)
-- Detailed technical specs for routine features
-- Micro-tasks for routine features
-- Untestable requirements
-- Artificial boundaries between routine systems
+Keep it short. Add detail to a slice when you start it, not before.
