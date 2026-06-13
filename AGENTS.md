@@ -1,47 +1,38 @@
 # Godogen Source Repo
 
-This repository is not a published game repo. It is the source for runtime skills and game-repo templates that are rendered by engine and host agent.
+This repository is not a published game repo. It is the source that `publish.sh` renders into a runtime game repo for a chosen engine, host agent, and delivery mode.
 
 ## Source Layout
 
-- `shared/` — engine-agnostic `godogen` files, shared hook templates, and common game-repo instructions
-- `godot/` — Godot-specific `godogen` files, `godot-api`, Godot capture hook helpers, and Godot game-repo instructions
-- `bevy/` — Bevy-specific `godogen` files, `bevy-help`, Bevy capture hook helpers, and Bevy game-repo instructions
-- `babylon/` — Babylon.js-specific `godogen` files, `babylon-help`, Vite scaffold, browser capture hook helpers, and Babylon game-repo instructions
-- `publish.sh` — renders a runtime repo with `--engine {godot,bevy,babylon}` and `--agent {claude,codex}`
+- `prompts/` — engine-agnostic runtime text:
+  - `runtime.md` — the process preamble for the runtime manifest
+  - `oneshot.md`, `interactive.md` — the delivery-regime blocks
+- `asset-gen/` — the asset-generation skill (CLI tools + docs), the one skill every published repo carries
+- `engines/babylon.md`, `engines/godot.md`, `engines/bevy.md` — per-engine guides (stack, project sketch, capture recipe, silent-failure traps)
+- `publish.sh` — renders a runtime repo with `--engine {godot,bevy,babylon}`, `--agent {claude,codex}`, `--mode {oneshot,interactive}`
+- `scripts/` — render helpers: `render_dir.py` (token substitution), `generate_codex_metadata.py` (Codex `openai.yaml`)
 
-Claude vs Codex is a publish-time render choice, not a source-tree split.
+Engine, host agent, and mode are all publish-time render choices, not source-tree splits.
 
 ## Source vs Runtime
 
-- `godot/game-engine.md`, `bevy/game-engine.md`, and `babylon/game-engine.md` render to `CLAUDE.md` or `AGENTS.md` in published game repos.
-- Runtime skills render to `.claude/skills/` for Claude Code and `.agents/skills/` for Codex.
-- Runtime hooks render to `.claude/hooks/` or `.codex/hooks/`.
-- Codex `agents/openai.yaml` files are generated from each skill's rendered `SKILL.md` frontmatter.
+A published repo is docs plus one skill:
+
+- The runtime manifest (`CLAUDE.md` for Claude, `AGENTS.md` for Codex) is assembled from `prompts/runtime.md` + the chosen `prompts/<mode>.md`.
+- `engines/<engine>.md` renders to `<engine>.md` (e.g. `babylon.md`) at the repo root — the guide the manifest points to.
+- `asset-gen` renders to `.claude/skills/` (Claude) or `.agents/skills/` (Codex); Codex `agents/openai.yaml` is generated from its `SKILL.md` frontmatter.
 - Do not create or maintain `.claude/skills/` or `.agents/skills/` in this source repo.
+
+The agent builds everything else — project scaffold, capture tooling, scene wiring — from the engine guide. The runtime repo ships no project template.
 
 ## Skills
 
-Published Godot repos carry:
-
-- **godogen**
-- **godot-api**
-
-Published Bevy repos carry:
-
-- **godogen**
-- **bevy-help**
-
-Published Babylon.js repos carry:
-
-- **godogen**
-- **babylon-help**
+Every published repo carries exactly one skill: **asset-gen** (image / GLB / rigged-character / animated-sprite generation, shared across engines). Engine knowledge lives in the engine guide, not in a skill.
 
 ## Editing Rules
 
-- Engine-specific work stays in the matching subtree: `godot/` or `bevy/`.
-- Shared behavior stays in `shared/` only when it is genuinely engine-agnostic.
-- Do not align Godot and Bevy behavior unless asked or the file belongs under `shared/`.
-- If you change a skill's user-facing purpose, update its `SKILL.md` frontmatter. Do not hand-edit generated `agents/openai.yaml`.
-- When writing skills: don't give obvious guidance. The agent is a highly capable LLM; handholding only pollutes the context.
-- When you change or remove a feature, describe the new state on its own terms. Don't define it against what's gone ("now a live URL, not a video") — once the old behavior is forgotten the contrast is just noise. Name the new thing as if it were always the design.
+- Engine-specific guidance stays in `engines/<engine>.md`. Engine-agnostic process stays in `prompts/runtime.md` and `prompts/{oneshot,interactive}.md`.
+- Asset tooling and docs stay in `asset-gen/`.
+- If you change the asset skill's user-facing purpose, update its `SKILL.md` frontmatter. Do not hand-edit generated `agents/openai.yaml`.
+- Don't give obvious guidance. The agent is a highly capable LLM, and the deliverable (a recorded video, or a live URL the user watches) surfaces its own mistakes — so keep the guides to what the model can't infer or discover fast: the project sketch, the capture recipe, and the few silent-failure traps that pass a compile but break at runtime.
+- When you change or remove a feature, describe the new state on its own terms. Name the new thing as if it were always the design.

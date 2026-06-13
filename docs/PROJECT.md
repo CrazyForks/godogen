@@ -1,65 +1,56 @@
 # Godogen — From Prompt to Playable Game
 
-Godogen is an autonomous development pipeline for turning a natural-language game brief into a playable Godot, Bevy, or Babylon.js project. It plans the game, generates visual direction and assets, writes code, and captures media from the running engine for visual review.
+Godogen turns a natural-language game brief into a playable Godot, Bevy, or Babylon.js project. The agent builds the game, generates assets, runs the engine, and proves the result from the running game.
 
-It is not a game engine, a code generator, or an asset marketplace. It is a source repo for runtime skills that are published into a fresh game repo and then executed by Claude Code or Codex.
+It is not a game engine, a code generator, or an asset marketplace. It is a source repo that publishes a thin runtime — a manifest, an engine guide, and an asset skill — into a fresh game repo that Claude Code or Codex then builds in.
 
 ## Source Model
 
-The repo is organized by engine:
+The repo is organized by engine, with the cross-engine pieces shared:
 
-- `shared/` — engine-agnostic `godogen` stages, the shared `Stop` hook, and common published-repo instructions
-- `godot/` — Godot-specific `godogen` stages and `godot-api`
-- `bevy/` — Bevy-specific `godogen` stages and `bevy-help`
-- `babylon/` — Babylon.js-specific `godogen` stages, Vite scaffold, browser capture, and `babylon-help`
+- `prompts/` — the runtime manifest preamble (`runtime.md`) and the delivery-mode blocks (`oneshot.md`, `interactive.md`)
+- `asset-gen/` — the `asset-gen` skill
+- `engines/babylon.md`, `engines/godot.md`, `engines/bevy.md` — per-engine guides
 
-Claude Code vs Codex is selected at render time:
+Engine, host agent, and delivery mode are selected at render time:
 
 ```bash
-./publish.sh --engine godot --agent claude --out ~/game
-./publish.sh --engine godot --agent codex --out ~/game
-./publish.sh --engine bevy --agent claude --out ~/game
-./publish.sh --engine bevy --agent codex --out ~/game
-./publish.sh --engine babylon --agent claude --out ~/game
-./publish.sh --engine babylon --agent codex --out ~/game
+./publish.sh --engine godot   --agent claude --out ~/game                  # one-shot (default)
+./publish.sh --engine babylon --agent codex  --out ~/game                  # interactive (default)
+./publish.sh --engine bevy    --agent claude --mode oneshot --out ~/game
 ```
 
-Publishing writes `CLAUDE.md` plus `.claude/skills/` for Claude Code, or `AGENTS.md` plus `.agents/skills/` for Codex. Codex `agents/openai.yaml` files are generated from each rendered `SKILL.md` frontmatter.
+Publishing writes `CLAUDE.md` + `.claude/skills/` for Claude Code, or `AGENTS.md` + `.agents/skills/` for Codex, plus the `<engine>.md` guide. Codex `agents/openai.yaml` is generated from the `asset-gen` `SKILL.md` frontmatter.
 
-## Pipeline
+## How a run works
 
-The `godogen` skill orchestrates the run and loads stage-specific files only when they are needed:
+The runtime manifest is short: read the brief, build the game, keep durable status in `README.md`, generate assets with `asset-gen`, and follow the engine guide for stack, project sketch, and capture. There is no fixed multi-stage pipeline and no prescribed document protocol — a capable model plans and decomposes the work itself. The two things the manifest fixes are *where durable state lives* (`README.md`, so a run survives compaction) and *what proof the mode demands*.
 
-1. **Visual target** — generate `reference.png` and write art direction into `ASSETS.md`.
-2. **Decomposition** — write `PLAN.md`, isolating only genuinely risky features.
-3. **Scaffold** — create or update the engine project shell and `STRUCTURE.md`.
-4. **Asset planning and generation** — spend the user-provided budget on the assets that matter most.
-5. **Task execution** — implement risk slices first, then the main build.
-6. **Capture** — create a fresh `screenshots/result/{N}/` bundle with raw `frameXXX.png` files and `video.mp4`.
-7. **Telegram push** — the shared stop hook pushes the latest proof video to Telegram when `tg-push` and `TG_*` env vars are configured; otherwise it no-ops.
+The engine guide carries only what the model can't infer or discover quickly: the project sketch (what stack and layout to stand up), the capture recipe (how to render the running game headlessly), and the handful of silent-failure traps that pass a compile but break at runtime.
 
-The document protocol is deliberate. `PLAN.md`, `STRUCTURE.md`, `ASSETS.md`, and `MEMORY.md` survive context compaction and let the run resume from files instead of conversational memory.
+## Delivery Modes
+
+- **one-shot** — unattended build. The deliverable is the finished project plus a 15–20s recording of the running game, which the agent watches back before finishing. Default for Godot/Bevy.
+- **interactive** — the user watches the live game (a Babylon.js URL, or a Godot/Bevy project they run) and steers at decisions of taste, scope, or cost. Default for Babylon.js.
+
+The difference between modes is a few lines of manifest text; everything about *how to show* the game lives in the engine guide, which makes interactive and one-shot near-free to offer on any engine.
 
 ## Engine Support
 
-Godot output is a Godot 4 C#/.NET project. The Godot runtime skill uses scene builders for generated `.tscn` files, runtime scripts for gameplay, `godot-api` for targeted engine lookup, and a Godot capture helper for final proof bundles.
-
-Bevy output is a Rust/Bevy project. The Bevy runtime skill uses code-first scene construction, local Bevy rustdoc/examples through `bevy-help`, and a dedicated capture path for final proof bundles.
-
-Babylon.js output is a TypeScript/Vite browser project. The Babylon runtime skill uses a disposable Vite scaffold, scene-level hot reload, local npm package lookup through `babylon-help`, and Chrome/Chromium browser capture.
-
-Godot and Bevy final proof bundles include `video.mp4` plus raw frames. Babylon final proof bundles record browser video directly and include `video.webm` plus encoded `video.mp4`.
+- **Godot** — Godot 4 C#/.NET. Scenes are generated at build time by headless `SceneTree` scripts; the guide carries the serialization rules (owner chain, GLB-recursion trap, post-pack validation) and the `--write-movie` + ffmpeg capture recipe.
+- **Bevy** — Rust/Bevy 0.18, ECS scenes spawned `OnEnter`. The guide pins the version, points the agent at the installed source for current APIs, and gives the offscreen `RenderTarget::Image` capture recipe.
+- **Babylon.js** — TypeScript/Vite, served at a live URL. The guide covers the side-effect-import trap, Havok physics, and headless Chrome capture.
 
 ## What Makes This Different
 
-**Capture-first proof.** The pipeline captures actual frames from the game and assembles them into a final proof bundle, so the run is judged on what the game looks like rather than on what the code claims.
+**Proof over claims.** A run is judged on the running game — a recorded clip or a live URL — not on code that compiles.
 
-**Progressive loading.** The orchestrator reads only the stage file it needs at the moment. Support skills keep large engine references out of the main context.
+**Trust the model.** The runtime ships no scaffold and no planner. The model recreates boilerplate from a short sketch and decomposes the work itself; the guides spend their words only on what it genuinely can't know.
 
-**Budget-aware asset generation.** Gemini, Grok, and Tripo3D are used where they make economic sense, and generated assets are assigned back into `PLAN.md` so implementation does not lose them.
+**Cost-aware asset generation.** Gemini, Grok, and Tripo3D are used where they make economic sense — the agent confirms costs with the user before generating, and the asset manifest in `README.md` tracks paths, in-game sizes, and costs so implementation doesn't lose them.
 
-**Engine-specific expertise without agent duplication.** Godot, Bevy, and Babylon.js are different enough to keep their engine docs separate. Claude and Codex are similar enough to render from one source.
+**One source, many targets.** Engine, host agent, and mode are render-time choices over one source tree.
 
 ## Runtime Limitations
 
-The current runtime does not ship a dedicated audio pipeline. Godot supports debug APK export when requested; Bevy and Babylon mobile/native packaging are not implemented yet.
+The runtime does not ship a dedicated audio pipeline or mobile/native packaging.

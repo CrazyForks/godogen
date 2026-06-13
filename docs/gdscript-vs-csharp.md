@@ -22,7 +22,7 @@ Other C#-specific additions:
 - `dotnet build` step in the pipeline (replaces per-file `--check-only`)
 - `partial` class requirement on every Godot class
 - Signal delegates must end in `EventHandler`
-- C# enum names are unreliable in LLM output (training data is predominantly GDScript) — explicit `godot-api` lookup instruction added
+- C# enum names are unreliable in LLM output (training data is predominantly GDScript) — the engine guide tells the agent to verify them against the installed Godot rather than guess
 
 ## Code comparison: asset loading
 
