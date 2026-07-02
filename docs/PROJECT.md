@@ -29,7 +29,7 @@ The engine guide carries only what the model can't infer or discover quickly: th
 
 ## Delivery
 
-The agent decides in-run how to involve the user, from the task and their presence. An engaged user gets the live game early — a Babylon.js URL, or a Godot/Bevy project they run — and steers at decisions of taste, scope, or cost. An absent user doesn't block the build: the agent makes reasonable calls, finishes, and closes with a 15–20s recording of the running game, which it watches back before calling the work done.
+The agent decides in-run how to involve the user, reading it from how the task is framed. A task phrased as an open-ended direction gets the live game early — a Babylon.js URL, or a Godot/Bevy project they run — with the user steering at decisions of taste, scope, or cost. A task handed over as a finished brief doesn't block on anyone: the agent makes reasonable calls, finishes, and closes with a 15–20s recording of the running game, which it watches back before calling the work done.
 
 The manifest states only this intent; everything about *how to show and capture* the game lives in the engine guide, so both paths come free on any engine.
 
