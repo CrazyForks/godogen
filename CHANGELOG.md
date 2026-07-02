@@ -1,5 +1,13 @@
 # Changelog
 
+**2026-07-02 — Docs-only runtime**
+- Replaced the multi-stage skill pipeline with a thin runtime: a single engine-agnostic manifest (`prompts/runtime.md`), a one-page per-engine guide, and the cross-engine `asset-gen` skill. The model plans, scaffolds, and decomposes the work itself.
+- One runtime manifest covers delivery. The agent reads the task and the user's presence in-run: an engaged user gets the live game early and checkpoints at taste/scope/cost decisions; an unattended run finishes on reasonable calls and closes with a 15–20s proof recording, watched back before done. Run/show/capture mechanics live in the engine guides and serve both paths.
+- Dropped the planner/decomposer/architecture/scene/scaffold/quirks/capture skill docs, the Vite scaffold, the `godot-api` / `bevy-help` / `babylon-help` lookup skills, and all hooks. The engine-specific traps and capture recipes that survive a compile but fail at runtime moved into the engine guide.
+- Trimmed asset docs to generation only; `asset-gen` is now the sole published skill.
+- Reorganized the source tree: engine-agnostic runtime text lives in `prompts/runtime.md`, and the asset skill lives at top-level `asset-gen/`.
+- Continues the 2026-04-26 "dropped Gemini verification" trajectory — removing guidance the current model no longer needs.
+
 **2026-05-18 — Babylon.js support**
 - Added Babylon.js as a first-class engine alongside Godot and Bevy
 - Disposable TypeScript/Vite scaffold with scene-level hot reload through a custom Vite plugin (`godogen:scene-change`); engine and canvas persist across edits
